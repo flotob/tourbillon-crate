@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+# audio never goes into the repo
+*.mp3
+*.flac
+*.wav
+*.aiff
+*.m4a

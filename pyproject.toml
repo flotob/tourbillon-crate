@@ -1,0 +1,37 @@
+[project]
+name = "crate"
+version = "0.1.0"
+description = "Turns tracks into bar-sliced stems for Tourbillon"
+authors = [
+    { email = "florian@glatz-mahlberg.de" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "beat-this",
+    "demucs>=4.1",
+    "numpy>=1.26.4",
+    "soundfile>=0.14.0",
+]
+
+[project.scripts]
+crate = "crate:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+beat-this = { git = "https://github.com/CPJKU/beat_this.git" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
+
+[tool.uv]
+# apple silicon for local use, linux for a later cloud deployment; intel macs would pin torch to 2.2
+environments = ["sys_platform == 'darwin' and platform_machine == 'arm64'", "sys_platform == 'linux'"]
+
+[tool.ruff]
+line-length = 120
