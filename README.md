@@ -64,7 +64,7 @@ uv run crate add ~/Music/track.mp3 --name acid   # --bpm 128 forces the tempo if
 uv run crate tempo acid 124                      # the record at 124 bpm, same pitch
 uv run crate drums acid                          # its drum patterns and kit (installs ADTOF the first time)
 uv run crate list
-uv run crate analyze                            # recomputes key, what plays where and bass notes for existing records
+uv run crate analyze                            # recomputes key, what plays where, bass notes and outline for existing records
 uv run crate serve                              # for Strudel without Tourbillon
 ```
 
@@ -77,6 +77,7 @@ processed locally and never leaves your machine.
 
 ```
 <name>/record.json                 tempo, key, grid, stems, bars, levels and playing ranges per stem, beats
+<name>/outline.json                each stem's loudness per 64th of a bar, for a zoomed-in view
 <name>/stems/<stem>.flac           whole stems
 <name>/bars/<stem>/NNN.flac        bar NNN of a stem, starting at the first downbeat
 <name>/tempo/<bpm>/<stem>/NNN.flac the same bar at another tempo

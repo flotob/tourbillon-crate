@@ -114,7 +114,7 @@ def main() -> None:
     )
     drums_cmd.add_argument("name")
     analyze_cmd = commands.add_parser(
-        "analyze", help="recompute key, what plays where and bass notes, e.g. after an update"
+        "analyze", help="recompute key, what plays where, bass notes and outline, e.g. after an update"
     )
     analyze_cmd.add_argument("names", nargs="*", help="records to analyze, default all")
     for command in (add_cmd, tempo_cmd, drums_cmd, analyze_cmd):

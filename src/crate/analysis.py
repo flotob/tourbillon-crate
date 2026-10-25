@@ -16,6 +16,21 @@ def bar_levels(audio: np.ndarray, starts: list[int]) -> list[float]:
     return levels
 
 
+def outline(audio: np.ndarray, starts: list[int], steps: int) -> list[int]:
+    """Loudness in whole dBFS (RMS) of each 1/steps of every bar, bar after bar: the stem's outline in detail."""
+    power = np.square(audio, dtype=np.float64)
+    if power.ndim == 2:
+        power = power.mean(axis=1)
+    energy = np.concatenate([[0.0], np.cumsum(power)])
+    bounds = np.concatenate(
+        [np.rint(np.linspace(start, end, steps + 1)[:-1]) for start, end in pairwise(starts)] + [[starts[-1]]]
+    ).astype(int)
+    bounds = np.clip(bounds, 0, len(power))
+    lo, hi = bounds[:-1], bounds[1:]
+    rms = np.sqrt((energy[hi] - energy[lo]) / np.maximum(1, hi - lo))
+    return np.maximum(SILENCE_DB, np.rint(20 * np.log10(rms + 1e-12))).astype(int).tolist()
+
+
 def active_bars(levels, below_peak_db: float = 18.0, floor_db: float = -45.0) -> np.ndarray:
     """Bars in which a stem plays: close to its own loud bars. Separation leaves quiet bleed in every stem."""
     levels = np.asarray(levels, dtype=float)

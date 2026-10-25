@@ -2,6 +2,7 @@
 
 Layout of a record in the crate:
     <name>/record.json           metadata: tempo, key, grid, stems, bars, what plays where, bass notes
+    <name>/outline.json          each stem's loudness per 64th of a bar, for a zoomed-in view
     <name>/stems/<stem>.flac     whole stems, for later processing
     <name>/bars/<stem>/NNN.flac  bar NNN of a stem, starting at the first downbeat
     <name>/tempo/<bpm>/...       the bars at other tempos (see tempo.py)
@@ -22,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from crate.analysis import bar_levels, playing_ranges
+from crate.analysis import bar_levels, outline, playing_ranges
 from crate.bass import bass_notes, quiet_level
 from crate.grid import Grid, align_to_transients, fit_grid
 from crate.key import detect_key
@@ -30,8 +31,10 @@ from crate.key import detect_key
 MODEL = "htdemucs"
 # the original audio, sliced like the stems
 MIX = "mix"
-# version of the record.json layout; 2 added the key, 3 the bass notes
-FORMAT = 3
+# version of the record.json layout; 2 added the key, 3 the bass notes, 4 outline.json
+FORMAT = 4
+# steps per bar in outline.json
+OUTLINE_STEPS = 64
 
 
 def file_hash(path: Path) -> str:
@@ -159,6 +162,18 @@ def analyze(tracks: dict[str, np.ndarray], starts: list[int], samplerate: int) -
     return result
 
 
+def write_outline(folder: Path, tracks: dict[str, np.ndarray], starts: list[int]):
+    """outline.json: each stem's loudness in dB per 1/OUTLINE_STEPS of a bar, bar after bar."""
+    data = {
+        "steps": OUTLINE_STEPS,
+        "levels": {stem: outline(audio, starts, OUTLINE_STEPS) for stem, audio in tracks.items()},
+    }
+    # replaced in one step, since the app may read it at any time
+    partial = folder / ".outline.json.partial"
+    partial.write_text(json.dumps(data, separators=(",", ":")))
+    partial.replace(folder / "outline.json")
+
+
 def add_record(
     source: Path,
     crate: Path,
@@ -230,6 +245,7 @@ def add_record(
         "downbeats": [round(float(t), 3) for t in downbeats],
     }
     log(f"  key {meta['key']} ({meta['camelot']}, strength {meta['key_strength']})")
+    write_outline(partial, tracks, starts)
     (partial / "record.json").write_text(json.dumps(meta, indent=1))
     folder = crate / name
     partial.rename(folder)
@@ -238,11 +254,14 @@ def add_record(
 
 
 def reanalyze(folder: Path):
-    """Recomputes the key and what plays where from the stems on disk, e.g. for records made by an older version."""
+    """Recomputes the key, what plays where, the bass notes and the outline from the stems on disk, e.g. for records
+    made by an older version."""
     meta = json.loads((folder / "record.json").read_text())
     grid = Grid(**meta["grid"])
     tracks = {stem: sf.read(folder / "stems" / f"{stem}.flac")[0] for stem in meta["stems"]}
-    meta.update(analyze(tracks, bar_starts(grid, meta["bars"], meta["samplerate"]), meta["samplerate"]))
+    starts = bar_starts(grid, meta["bars"], meta["samplerate"])
+    meta.update(analyze(tracks, starts, meta["samplerate"]))
+    write_outline(folder, tracks, starts)
     if "format" not in meta and Path(meta["source"]).exists():
         meta["title"], meta["artist"] = describe(Path(meta["source"]))
     meta["format"] = FORMAT
