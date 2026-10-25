@@ -8,11 +8,13 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from crate.record import records
+
 
 def manifest(crate: Path, base: str) -> dict:
     sounds = {"_base": base}
-    for meta_file in sorted(crate.glob("*/record.json")):
-        meta = json.loads(meta_file.read_text())
+    for folder in records(crate):
+        meta = json.loads((folder / "record.json").read_text())
         name = meta["name"]
         for stem in meta["stems"]:
             sounds[f"{name}_{stem}"] = [f"{name}/bars/{stem}/{bar:03d}.flac" for bar in range(meta["bars"])]
