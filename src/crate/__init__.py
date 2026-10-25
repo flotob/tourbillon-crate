@@ -113,7 +113,9 @@ def main() -> None:
         "drums", help="find a record's drum patterns and cut its kit (installs ADTOF on first use, about 1.5 GB)"
     )
     drums_cmd.add_argument("name")
-    analyze_cmd = commands.add_parser("analyze", help="recompute key and what plays where, e.g. after an update")
+    analyze_cmd = commands.add_parser(
+        "analyze", help="recompute key, what plays where and bass notes, e.g. after an update"
+    )
     analyze_cmd.add_argument("names", nargs="*", help="records to analyze, default all")
     for command in (add_cmd, tempo_cmd, drums_cmd, analyze_cmd):
         command.add_argument("--json", action="store_true", help="report progress as json lines, for the app")

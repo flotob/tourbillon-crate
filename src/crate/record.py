@@ -1,7 +1,7 @@
 """Turns an audio file into a record: stems, a bar grid, and one audio file per bar and stem.
 
 Layout of a record in the crate:
-    <name>/record.json           metadata: tempo, key, grid, stems, bars, what plays where
+    <name>/record.json           metadata: tempo, key, grid, stems, bars, what plays where, bass notes
     <name>/stems/<stem>.flac     whole stems, for later processing
     <name>/bars/<stem>/NNN.flac  bar NNN of a stem, starting at the first downbeat
     <name>/tempo/<bpm>/...       the bars at other tempos (see tempo.py)
@@ -23,14 +23,15 @@ import numpy as np
 import soundfile as sf
 
 from crate.analysis import bar_levels, playing_ranges
+from crate.bass import bass_notes, quiet_level
 from crate.grid import Grid, align_to_transients, fit_grid
 from crate.key import detect_key
 
 MODEL = "htdemucs"
 # the original audio, sliced like the stems
 MIX = "mix"
-# version of the record.json layout; 2 added the key
-FORMAT = 2
+# version of the record.json layout; 2 added the key, 3 the bass notes
+FORMAT = 3
 
 
 def file_hash(path: Path) -> str:
@@ -146,11 +147,16 @@ def bar_starts(grid: Grid, bars: int, samplerate: int) -> list[int]:
 
 
 def analyze(tracks: dict[str, np.ndarray], starts: list[int], samplerate: int) -> dict:
-    """Key and what plays where, for record.json."""
+    """Key, what plays where and the bass line as notes, for record.json."""
     levels = {stem: bar_levels(audio, starts) for stem, audio in tracks.items()}
     playing = {stem: playing_ranges(stem_levels) for stem, stem_levels in levels.items() if stem != MIX}
     stems = {stem: audio for stem, audio in tracks.items() if stem != MIX}
-    return {**detect_key(stems or tracks, samplerate), "levels": levels, "playing": playing}
+    result = {**detect_key(stems or tracks, samplerate), "levels": levels, "playing": playing}
+    if "bass" in tracks:
+        bass = tracks["bass"].mean(axis=1) if tracks["bass"].ndim == 2 else tracks["bass"]
+        bar_times = [start / samplerate for start in starts]
+        result["notes"] = {"bass": bass_notes(bass, samplerate, bar_times, quiet_level(levels["bass"]))}
+    return result
 
 
 def add_record(

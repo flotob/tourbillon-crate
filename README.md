@@ -15,6 +15,9 @@ For each audio file, `crate add`:
    (`src/crate/analysis.py`)
 6. finds the key with [Essentia](https://essentia.upf.edu)'s profile for electronic dance music, listening to
    everything but the drums (`src/crate/key.py`)
+7. writes the bass line as notes (`src/crate/bass.py`): a pitch tracker for one voice (YIN, in Essentia) decides which
+   note sounds on each 16th, and a note starts where the pitch changes, where the bass is struck again and at every
+   bar line. Transcribers made for chords, like Basic Pitch, smear sub-bass notes by up to a second.
 
 `crate tempo` makes a version of a record at another tempo without changing its pitch (`src/crate/tempo.py`):
 [Rubber Band](https://breakfastquay.com/rubberband/) stretches each stem, with every beat pinned to its new time,
@@ -61,7 +64,7 @@ uv run crate add ~/Music/track.mp3 --name acid   # --bpm 128 forces the tempo if
 uv run crate tempo acid 124                      # the record at 124 bpm, same pitch
 uv run crate drums acid                          # its drum patterns and kit (installs ADTOF the first time)
 uv run crate list
-uv run crate analyze                            # recomputes key and what plays where for existing records
+uv run crate analyze                            # recomputes key, what plays where and bass notes for existing records
 uv run crate serve                              # for Strudel without Tourbillon
 ```
 
@@ -85,8 +88,8 @@ processed locally and never leaves your machine.
 `key` is like `A minor`, `camelot` its place on the Camelot wheel (`8A`), and `key_strength` (0 to 1) how clearly
 the music follows that key.
 
-In `record.json`, `levels` holds each stem's loudness per bar in dBFS and `playing` the bar ranges
-`[start, end)` in which each stem plays.
+In `record.json`, `levels` holds each stem's loudness per bar in dBFS, `playing` the bar ranges
+`[start, end)` in which each stem plays, and `notes.bass` the bass line as `[bar, 16th, length in 16ths, midi note]`.
 
 ## Development
 
