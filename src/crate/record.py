@@ -5,6 +5,7 @@ Layout of a record in the crate:
     <name>/stems/<stem>.flac     whole stems, for later processing
     <name>/bars/<stem>/NNN.flac  bar NNN of a stem, starting at the first downbeat
     <name>/tempo/<bpm>/...       the bars at other tempos (see tempo.py)
+    <name>/drums/...             drum patterns and a kit cut from the record (see drums.py)
 
 A record is written to .<name>.partial first and renamed when complete.
 """

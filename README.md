@@ -21,12 +21,27 @@ For each audio file, `crate add`:
 and the result is cut into the same bars. Its faster R2 engine is used on purpose: it keeps kicks sharp, where the
 finer R3 engine softens them and lets them start early. An 8½ minute record takes about 25 seconds.
 
+`crate drums` finds a record's drum patterns (`src/crate/drums.py`): [ADTOF](https://github.com/MZehren/ADTOF) finds
+every kick, snare, hi-hat, tom and cymbal hit in the drums stem, and each hit is placed on a 16th of the grid with its
+velocity (in steps of 3 dB) and how far it is off the 16th, which shows swing. It also cuts a kit from the record: one
+hit of each drum where it rings out alone, found by following each hit's decay until it fades or something else starts
+(ADTOF misses quiet hits). A kick is followed below 1.5 kHz, so hi-hats over its tail don't cut it short. ADTOF's
+"toms" are mostly other percussion in electronic music, so that drum is called `perc`. An 8½ minute record takes
+about 10 seconds.
+
 Bar `n` of a stem is sample `n` of the sound `<record>_<stem>`:
 
 ```js
 setcpm(118/4) // one cycle is one bar at the record's tempo
 $: s("nataalma_drums").n("<64 65 66 67>")
 $: s("nataalma_vocals").n("<64 65 66 67>")
+```
+
+The kit is a bank, so a drum pattern plays on the record's own drums, or on any drum machine with
+`.bank("tr909")`:
+
+```js
+$: s("bd*4, ~ sd ~ sd, [~ hh]*4").bank("nataalma")
 ```
 
 ## In Tourbillon
@@ -44,6 +59,7 @@ ffmpeg brings rubberband along).
 ```bash
 uv run crate add ~/Music/track.mp3 --name acid   # --bpm 128 forces the tempo if half or double was detected
 uv run crate tempo acid 124                      # the record at 124 bpm, same pitch
+uv run crate drums acid                          # its drum patterns and kit (installs ADTOF the first time)
 uv run crate list
 uv run crate analyze                            # recomputes key and what plays where for existing records
 uv run crate serve                              # for Strudel without Tourbillon
@@ -62,6 +78,8 @@ processed locally and never leaves your machine.
 <name>/bars/<stem>/NNN.flac        bar NNN of a stem, starting at the first downbeat
 <name>/tempo/<bpm>/<stem>/NNN.flac the same bar at another tempo
 <name>/tempo/<bpm>/version.json    how that version was made
+<name>/drums/drums.json            every hit as [bar, 16th, velocity, ms off the 16th], per drum
+<name>/drums/<drum>.flac           the kit: bd, sd, hh, perc, cr (those with at least 4 hits)
 ```
 
 `key` is like `A minor`, `camelot` its place on the Camelot wheel (`8A`), and `key_strength` (0 to 1) how clearly
@@ -83,3 +101,9 @@ uv run ruff check && uv run ruff format
 the models are downloaded on first use. Essentia is AGPL-3.0 licensed. Rubber Band (GPL-2.0-or-later) runs as a
 separate program. Only import music you have the rights to use: the separated stems are
 derived from the original recording.
+
+ADTOF (code and model weights) is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
+free for non-commercial use only. It is not part of crate and not in this repository. `crate drums` downloads it on
+first use into its own environment (`<crate>/.tools/adtof`, about 1.5 GB, pinned in `src/crate/adtof/requirements.txt`)
+and runs it there as a separate program. `src/crate/adtof/run.py`, the script that runs inside that environment, is
+MIT licensed rather than AGPL, since it runs together with ADTOF.

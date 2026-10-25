@@ -78,6 +78,14 @@ def tempo(args, log=print, progress=lambda step, fraction: None, emit=None):
         emit("done", name=args.name, bpm=float(folder.name), existing=existing)
 
 
+def drums(args, log=print, progress=lambda step, fraction: None, emit=None):
+    from crate.drums import find_drums
+
+    result = find_drums(find_record(args.crate, args.name), args.crate, log=log, progress=progress)
+    if emit:
+        emit("done", name=args.name, drums=list(result["drums"]))
+
+
 def analyze(args, log=print, progress=lambda step, fraction: None, emit=None):
     from crate.record import reanalyze, records
 
@@ -101,16 +109,20 @@ def main() -> None:
     tempo_cmd = commands.add_parser("tempo", help="make a version of a record at another tempo, keeping its pitch")
     tempo_cmd.add_argument("name")
     tempo_cmd.add_argument("bpm", type=float)
+    drums_cmd = commands.add_parser(
+        "drums", help="find a record's drum patterns and cut its kit (installs ADTOF on first use, about 1.5 GB)"
+    )
+    drums_cmd.add_argument("name")
     analyze_cmd = commands.add_parser("analyze", help="recompute key and what plays where, e.g. after an update")
     analyze_cmd.add_argument("names", nargs="*", help="records to analyze, default all")
-    for command in (add_cmd, tempo_cmd, analyze_cmd):
+    for command in (add_cmd, tempo_cmd, drums_cmd, analyze_cmd):
         command.add_argument("--json", action="store_true", help="report progress as json lines, for the app")
     commands.add_parser("list", help="list the records in the crate")
     serve_cmd = commands.add_parser("serve", help="serve the crate to strudel")
     serve_cmd.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
 
-    tasks = {"add": add, "tempo": tempo, "analyze": analyze}
+    tasks = {"add": add, "tempo": tempo, "drums": drums, "analyze": analyze}
     if args.command in tasks and args.json:
         sys.exit(run_json(lambda log, progress, emit: tasks[args.command](args, log, progress, emit)))
     elif args.command in tasks:
@@ -123,9 +135,12 @@ def main() -> None:
             meta = json.loads((folder / "record.json").read_text())
             key = meta.get("key", "")
             also = ", ".join(tempo_label(bpm) for bpm in versions(folder))
+            drums_json = folder / "drums" / "drums.json"
+            kit = " ".join(json.loads(drums_json.read_text())["drums"]) if drums_json.exists() else ""
             print(
                 f"{meta['name']:<16} {meta['bpm']:7.2f} bpm  {key:<9} {meta['bars']:4d} bars  {meta['title']}"
                 + (f"  (also at {also} bpm)" if also else "")
+                + (f"  (drums: {kit})" if kit else "")
             )
     elif args.command == "serve":
         from crate.serve import serve
