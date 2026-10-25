@@ -1,9 +1,10 @@
 """Turns an audio file into a record: stems, a bar grid, and one audio file per bar and stem.
 
 Layout of a record in the crate:
-    <name>/record.json           metadata: tempo, grid, stems, bars, what plays where
+    <name>/record.json           metadata: tempo, key, grid, stems, bars, what plays where
     <name>/stems/<stem>.flac     whole stems, for later processing
     <name>/bars/<stem>/NNN.flac  bar NNN of a stem, starting at the first downbeat
+    <name>/tempo/<bpm>/...       the bars at other tempos (see tempo.py)
 
 A record is written to .<name>.partial first and renamed when complete.
 """
@@ -22,12 +23,13 @@ import soundfile as sf
 
 from crate.analysis import bar_levels, playing_ranges
 from crate.grid import Grid, align_to_transients, fit_grid
+from crate.key import detect_key
 
 MODEL = "htdemucs"
 # the original audio, sliced like the stems
 MIX = "mix"
-# version of the record.json layout
-FORMAT = 1
+# version of the record.json layout; 2 added the key
+FORMAT = 2
 
 
 def file_hash(path: Path) -> str:
@@ -142,11 +144,12 @@ def bar_starts(grid: Grid, bars: int, samplerate: int) -> list[int]:
     return [round(grid.bar_start(bar) * samplerate) for bar in range(bars + 1)]
 
 
-def analyze(tracks: dict[str, np.ndarray], starts: list[int]) -> dict:
-    """What plays where, for record.json."""
+def analyze(tracks: dict[str, np.ndarray], starts: list[int], samplerate: int) -> dict:
+    """Key and what plays where, for record.json."""
     levels = {stem: bar_levels(audio, starts) for stem, audio in tracks.items()}
     playing = {stem: playing_ranges(stem_levels) for stem, stem_levels in levels.items() if stem != MIX}
-    return {"levels": levels, "playing": playing}
+    stems = {stem: audio for stem, audio in tracks.items() if stem != MIX}
+    return {**detect_key(stems or tracks, samplerate), "levels": levels, "playing": playing}
 
 
 def add_record(
@@ -215,10 +218,11 @@ def add_record(
         "model": MODEL,
         "created_at": time.time(),
         "seconds": {"separation": separated - begin, "total": time.monotonic() - begin},
-        **analyze(tracks, starts),
+        **analyze(tracks, starts, samplerate),
         "beats": [round(float(t), 3) for t in beats],
         "downbeats": [round(float(t), 3) for t in downbeats],
     }
+    log(f"  key {meta['key']} ({meta['camelot']}, strength {meta['key_strength']})")
     (partial / "record.json").write_text(json.dumps(meta, indent=1))
     folder = crate / name
     partial.rename(folder)
@@ -227,12 +231,15 @@ def add_record(
 
 
 def reanalyze(folder: Path):
-    """Recomputes what plays where from the stems on disk, e.g. for records made by an older version."""
+    """Recomputes the key and what plays where from the stems on disk, e.g. for records made by an older version."""
     meta = json.loads((folder / "record.json").read_text())
     grid = Grid(**meta["grid"])
     tracks = {stem: sf.read(folder / "stems" / f"{stem}.flac")[0] for stem in meta["stems"]}
-    meta.update(analyze(tracks, bar_starts(grid, meta["bars"], meta["samplerate"])))
+    meta.update(analyze(tracks, bar_starts(grid, meta["bars"], meta["samplerate"]), meta["samplerate"]))
     if "format" not in meta and Path(meta["source"]).exists():
         meta["title"], meta["artist"] = describe(Path(meta["source"]))
     meta["format"] = FORMAT
-    (folder / "record.json").write_text(json.dumps(meta, indent=1))
+    # replaced in one step, since the app may read it at any time
+    partial = folder / ".record.json.partial"
+    partial.write_text(json.dumps(meta, indent=1))
+    partial.replace(folder / "record.json")

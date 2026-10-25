@@ -12,6 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "beat-this",
     "demucs>=4.1",
+    "essentia==2.1b6.dev1389",
     "numpy>=1.26.4",
     "soundfile>=0.14.0",
 ]
